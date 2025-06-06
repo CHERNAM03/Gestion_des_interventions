@@ -77,6 +77,19 @@
         // Créneaux horaires
         const timeSlots = ['Créneau A', 'Créneau B', 'Créneau C', 'Créneau D'];
 
+        // Sauvegarder les réservations dans LocalStorage
+        function saveBookingsToLocalStorage() {
+            localStorage.setItem('bookings', JSON.stringify(bookings));
+        }
+
+        // Charger les réservations depuis LocalStorage
+        function loadBookingsFromLocalStorage() {
+            const savedBookings = localStorage.getItem('bookings');
+            if (savedBookings) {
+                bookings = JSON.parse(savedBookings);
+            }
+        }
+
         function initCalendar() {
             const calendar = document.getElementById('calendar');
             dayNames.forEach(day => {
@@ -260,6 +273,7 @@
                 timestamp: new Date().toISOString()
             };
 
+            saveBookingsToLocalStorage(); // Sauvegarder dans LocalStorage
             updateCalendarDisplay();
             alert('Réservation confirmée ! Votre créneau est maintenant réservé de manière définitive.');
             closeForm();
@@ -273,6 +287,7 @@
 
             if (bookings[slotKey]) {
                 delete bookings[slotKey];
+                saveBookingsToLocalStorage(); // Sauvegarder après suppression
                 updateCalendarDisplay();
                 alert('Réservation supprimée avec succès.');
             } else {
@@ -318,6 +333,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            loadBookingsFromLocalStorage(); // Charger les réservations au démarrage
             initCalendar();
 
             if (userRole !== 'admin') {
