@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planning Interventions Plomberie</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <meta name="description" content="Planning des interventions de plomberie pour les techniciens.">
+    <meta name="keywords" content="plomberie, interventions, planning, techniciens, gestion des tâches">
+    <meta name="author" content="Votre Nom ou Entreprise">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="theme-color" content="#4CAF50">
+</head>
+<body>
+    <div class="container">
+        <h1>Planning des Interventions Plomberie</h1>
+        <div class="info-box">
+            <h3>Informations importantes :</h3>
+            <p>• Période d'intervention : du 16 juin au 15 juillet 2025</p>
+            <p>• Horaires : 8h00 - 12h00 (4 créneaux par jour : A, B, C, D)</p>
+            <p>• Cliquez sur un créneau disponible pour réserver</p>
+            <p>• Une fois validé, votre choix devient définitif</p>
+        </div>
+        <div id="calendar" class="calendar"></div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <div class="booking-form" id="bookingForm">
+        <h3>Réservation de créneau</h3>
+        <div id="selectedSlot"></div>
+        <div class="form-group">
+            <label for="apartmentNumber">Numéro d'appartement *</label>
+            <input type="text" id="apartmentNumber" required>
+        </div>
+        <div class="form-group">
+            <label for="lastName">Nom *</label>
+            <input type="text" id="lastName" required>
+        </div>
+        <div class="form-group">
+            <label for="firstName">Prénom *</label>
+            <input type="text" id="firstName" required>
+        </div>
+        <div class="form-group">
+            <label for="phone">Téléphone *</label>
+            <input type="tel" id="phone" required>
+        </div>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email">
+        </div>
+        <div class="form-group">
+            <label for="signature">Signature *</label>
+            <canvas id="signature" class="signature-pad" width="400" height="100"></canvas>
+            <button type="button" class="btn btn-secondary" onclick="clearSignature()">Effacer</button>
+        </div>
+        <div style="text-align: center; margin-top: 20px;">
+            <button class="btn btn-success" onclick="confirmBooking()">Confirmer la réservation</button>
+            <button class="btn btn-secondary" onclick="closeForm()">Annuler</button>
+        </div>
+    </div>
+
+    <button class="export-btn" onclick="exportToExcel()">Exporter vers Excel</button>
+
+    <script>
+        let currentBooking = null;
+        let isDrawing = false;
+        let bookings = {};
+
+        // Définir le rôle de l'utilisateur (admin ou locataire)
+        const userRole = 'admin'; // Peut être 'admin' ou 'locataire'
+
+        // Jours de la semaine
+        const dayNames = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+        const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+
+        // Créneaux horaires
+        const timeSlots = ['Créneau A', 'Créneau B', 'Créneau C', 'Créneau D'];
+
+        function initCalendar() {
+            const calendar = document.getElementById('calendar');
+            dayNames.forEach(day => {
+                const header = document.createElement('div');
+                header.className = 'day-header';
+                header.textContent = day;
+                calendar.appendChild(header);
+            });
+
+            const startDate = new Date(2025, 5, 16);
+            const endDate = new Date(2025, 6, 15);
+            const firstDayOfWeek = startDate.getDay();
+            const daysToAdd = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
+            for (let i = daysToAdd; i > 0; i--) {
+                const emptyDay = document.createElement('div');
+                emptyDay.className = 'day-cell';
+                calendar.appendChild(emptyDay);
+            }
+
+            const currentDate = new Date(startDate);
+            while (currentDate <= endDate) {
+                const dayCell = createDayCell(new Date(currentDate));
+                calendar.appendChild(dayCell);
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+        }
+
+        function createDayCell(date) {
+            const dayCell = document.createElement('div');
+            const dayOfWeek = date.getDay();
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+            dayCell.className = `day-cell ${isWeekend ? 'weekend' : 'available'}`;
+            const dayNumber = document.createElement('div');
+            dayNumber.className = 'day-number';
+            dayNumber.textContent = date.getDate();
+            dayCell.appendChild(dayNumber);
+
+            if (!isWeekend) {
+                const timeSlotsContainer = document.createElement('div');
+                timeSlotsContainer.className = 'time-slots';
+
+                timeSlots.forEach(slot => {
+                    const timeSlot = document.createElement('div');
+                    timeSlot.className = 'time-slot available';
+                    timeSlot.textContent = slot;
+                    timeSlot.onclick = () => openBookingForm(date, slot);
+
+                    const slotKey = `${date.toISOString().split('T')[0]}_${slot}`;
+                    if (bookings[slotKey]) {
+                        timeSlot.className = 'time-slot reserved';
+                        timeSlot.onclick = null;
+
+                        const info = document.createElement('div');
+                        info.className = 'reserved-info';
+                        info.textContent = `Apt ${bookings[slotKey].apartmentNumber}`;
+                        timeSlot.appendChild(info);
+                    }
+
+                    timeSlotsContainer.appendChild(timeSlot);
+                });
+
+                dayCell.appendChild(timeSlotsContainer);
+            } else {
+                const weekendText = document.createElement('div');
+                weekendText.textContent = 'Weekend';
+                weekendText.style.textAlign = 'center';
+                weekendText.style.color = '#999';
+                weekendText.style.marginTop = '20px';
+                dayCell.appendChild(weekendText);
+            }
+
+            return dayCell;
+        }
+
+        function openBookingForm(date, slot) {
+            currentBooking = { date, slot };
+            const selectedSlot = document.getElementById('selectedSlot');
+            selectedSlot.innerHTML = `<strong>Créneau sélectionné :</strong> ${formatDate(date)} - ${slot}`;
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('bookingForm').style.display = 'block';
+            initSignaturePad();
+        }
+
+        function closeForm() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('bookingForm').style.display = 'none';
+            currentBooking = null;
+            clearForm();
+        }
+
+        function clearForm() {
+            document.getElementById('apartmentNumber').value = '';
+            document.getElementById('lastName').value = '';
+            document.getElementById('firstName').value = '';
+            document.getElementById('phone').value = '';
+            document.getElementById('email').value = '';
+            clearSignature();
+        }
+
+        function initSignaturePad() {
+            const canvas = document.getElementById('signature');
+            const ctx = canvas.getContext('2d');
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('touchstart', startDrawing);
+            canvas.addEventListener('touchmove', draw);
+            canvas.addEventListener('touchend', stopDrawing);
+
+            function startDrawing(e) {
+                isDrawing = true;
+                draw(e);
+            }
+
+            function draw(e) {
+                if (!isDrawing) return;
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX || e.touches[0].clientX) - rect.left;
+                const y = (e.clientY || e.touches[0].clientY) - rect.top;
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = '#000';
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+            }
+
+            function stopDrawing() {
+                if (isDrawing) {
+                    isDrawing = false;
+                    ctx.beginPath();
+                }
+            }
+        }
+
+        function clearSignature() {
+            const canvas = document.getElementById('signature');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function confirmBooking() {
+            if (userRole === 'locataire' && Object.keys(bookings).filter(key => bookings[key].email === document.getElementById('email').value).length > 0) {
+                alert('Vous avez déjà effectué une réservation. Vous ne pouvez pas en faire une autre.');
+                return;
+            }
+
+            const apartmentNumber = document.getElementById('apartmentNumber').value;
+            const lastName = document.getElementById('lastName').value;
+            const firstName = document.getElementById('firstName').value;
+            const phone = document.getElementById('phone').value;
+
+            if (!apartmentNumber || !lastName || !firstName || !phone) {
+                alert('Veuillez remplir tous les champs obligatoires.');
+                return;
+            }
+
+            const canvas = document.getElementById('signature');
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const hasSignature = imageData.data.some(pixel => pixel !== 0);
+
+            if (!hasSignature) {
+                alert('Veuillez signer avant de confirmer.');
+                return;
+            }
+
+            const slotKey = `${currentBooking.date.toISOString().split('T')[0]}_${currentBooking.slot}`;
+            bookings[slotKey] = {
+                apartmentNumber,
+                lastName,
+                firstName,
+                phone,
+                email: document.getElementById('email').value,
+                signature: canvas.toDataURL(),
+                date: currentBooking.date.toISOString(),
+                slot: currentBooking.slot,
+                timestamp: new Date().toISOString()
+            };
+
+            updateCalendarDisplay();
+            alert('Réservation confirmée ! Votre créneau est maintenant réservé de manière définitive.');
+            closeForm();
+        }
+
+        function deleteBooking(slotKey) {
+            if (userRole !== 'admin') {
+                alert('Vous n’avez pas les droits pour effectuer cette action.');
+                return;
+            }
+
+            if (bookings[slotKey]) {
+                delete bookings[slotKey];
+                updateCalendarDisplay();
+                alert('Réservation supprimée avec succès.');
+            } else {
+                alert('Aucune réservation trouvée pour ce créneau.');
+            }
+        }
+
+        function updateCalendarDisplay() {
+            const calendar = document.getElementById('calendar');
+            calendar.innerHTML = '';
+            initCalendar();
+        }
+
+        function formatDate(date) {
+            const day = date.getDate();
+            const month = monthNames[date.getMonth()];
+            const year = date.getFullYear();
+            return `${day} ${month} ${year}`;
+        }
+
+        function exportToExcel() {
+            if (userRole !== 'admin') {
+                alert('Vous n’avez pas les droits pour effectuer cette action.');
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Date,Créneau,Appartement,Nom,Prénom,Téléphone,Email,Horodatage\n";
+
+            Object.values(bookings).forEach(booking => {
+                const date = new Date(booking.date);
+                const formattedDate = formatDate(date);
+                csvContent += `"${formattedDate}","${booking.slot}","${booking.apartmentNumber}","${booking.lastName}","${booking.firstName}","${booking.phone}","${booking.email}","${new Date(booking.timestamp).toLocaleString()}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "planning_plomberie_" + new Date().toISOString().split('T')[0] + ".csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initCalendar();
+
+            if (userRole !== 'admin') {
+                document.querySelector('.export-btn').style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
