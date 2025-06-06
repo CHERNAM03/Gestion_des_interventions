@@ -336,6 +336,7 @@
             loadBookingsFromLocalStorage(); // Charger les réservations au démarrage
             initCalendar();
 
+            // Masquer le bouton "Exporter vers Excel" si l'utilisateur n'est pas admin
             if (userRole !== 'admin') {
                 document.querySelector('.export-btn').style.display = 'none';
             }
