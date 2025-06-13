@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,8 +13,20 @@
     <meta name="theme-color" content="#4CAF50">
 </head>
 <body>
+    <!-- HEADER -->
+    <header class="main-header">
+        <div class="header-content">
+            <div class="header-title">
+                <h1>Planning des Interventions Plomberie</h1>
+            </div>
+            <div class="header-info">
+                <span><strong>Nom :</strong> <span id="headerLastName"></span></span>
+                <span><strong>Téléphone :</strong> <span id="headerPhone"></span></span>
+            </div>
+        </div>
+    </header>
+
     <div class="container">
-        <h1>Planning des Interventions Plomberie</h1>
         <div class="info-box">
             <h3>Informations importantes :</h3>
             <p>• Période d'intervention : du 16 juin au 15 juillet 2025</p>
@@ -29,6 +41,14 @@
     <div class="booking-form" id="bookingForm">
         <h3>Réservation de créneau</h3>
         <div id="selectedSlot"></div>
+        <div class="form-group">
+            <label for="buildingNumber">Numéro d'immeuble *</label>
+            <input type="text" id="buildingNumber" required>
+        </div>
+        <div class="form-group">
+            <label for="floor">Étage *</label>
+            <input type="text" id="floor" required>
+        </div>
         <div class="form-group">
             <label for="apartmentNumber">Numéro d'appartement *</label>
             <input type="text" id="apartmentNumber" required>
@@ -61,6 +81,13 @@
     </div>
 
     <button class="export-btn" onclick="exportToExcel()">Exporter vers Excel</button>
+
+    <!-- FOOTER -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <p>&copy; 2025 - Votre Nom ou Entreprise. Tous droits réservés.</p>
+        </div>
+    </footer>
 
     <script>
         let currentBooking = null;
@@ -173,6 +200,10 @@
             document.getElementById('overlay').style.display = 'block';
             document.getElementById('bookingForm').style.display = 'block';
             initSignaturePad();
+
+            // Pré-remplir le header avec nom et téléphone si disponibles
+            document.getElementById('headerLastName').innerText = document.getElementById('lastName').value;
+            document.getElementById('headerPhone').innerText = document.getElementById('phone').value;
         }
 
         function closeForm() {
@@ -183,6 +214,8 @@
         }
 
         function clearForm() {
+            document.getElementById('buildingNumber').value = '';
+            document.getElementById('floor').value = '';
             document.getElementById('apartmentNumber').value = '';
             document.getElementById('lastName').value = '';
             document.getElementById('firstName').value = '';
@@ -240,12 +273,14 @@
                 return;
             }
 
+            const buildingNumber = document.getElementById('buildingNumber').value;
+            const floor = document.getElementById('floor').value;
             const apartmentNumber = document.getElementById('apartmentNumber').value;
             const lastName = document.getElementById('lastName').value;
             const firstName = document.getElementById('firstName').value;
             const phone = document.getElementById('phone').value;
 
-            if (!apartmentNumber || !lastName || !firstName || !phone) {
+            if (!buildingNumber || !floor || !apartmentNumber || !lastName || !firstName || !phone) {
                 alert('Veuillez remplir tous les champs obligatoires.');
                 return;
             }
@@ -262,6 +297,8 @@
 
             const slotKey = `${currentBooking.date.toISOString().split('T')[0]}_${currentBooking.slot}`;
             bookings[slotKey] = {
+                buildingNumber,
+                floor,
                 apartmentNumber,
                 lastName,
                 firstName,
@@ -277,6 +314,10 @@
             updateCalendarDisplay();
             alert('Réservation confirmée ! Votre créneau est maintenant réservé de manière définitive.');
             closeForm();
+
+            // Mettre à jour le header avec les infos du locataire
+            document.getElementById('headerLastName').innerText = lastName;
+            document.getElementById('headerPhone').innerText = phone;
         }
 
         function deleteBooking(slotKey) {
@@ -287,7 +328,7 @@
 
             if (bookings[slotKey]) {
                 delete bookings[slotKey];
-                saveBookingsToLocalStorage(); // Sauvegarder après suppression
+                saveBookingsToLocalStorage();
                 updateCalendarDisplay();
                 alert('Réservation supprimée avec succès.');
             } else {
@@ -315,12 +356,12 @@
             }
 
             let csvContent = "data:text/csv;charset=utf-8,";
-            csvContent += "Date,Créneau,Appartement,Nom,Prénom,Téléphone,Email,Horodatage\n";
+            csvContent += "Date,Créneau,Immeuble,Étage,Appartement,Nom,Prénom,Téléphone,Email,Horodatage\n";
 
             Object.values(bookings).forEach(booking => {
                 const date = new Date(booking.date);
                 const formattedDate = formatDate(date);
-                csvContent += `"${formattedDate}","${booking.slot}","${booking.apartmentNumber}","${booking.lastName}","${booking.firstName}","${booking.phone}","${booking.email}","${new Date(booking.timestamp).toLocaleString()}"\n`;
+                csvContent += `"${formattedDate}","${booking.slot}","${booking.buildingNumber || ''}","${booking.floor || ''}","${booking.apartmentNumber}","${booking.lastName}","${booking.firstName}","${booking.phone}","${booking.email}","${new Date(booking.timestamp).toLocaleString()}"\n`;
             });
 
             const encodedUri = encodeURI(csvContent);
@@ -333,7 +374,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            loadBookingsFromLocalStorage(); // Charger les réservations au démarrage
+            loadBookingsFromLocalStorage();
             initCalendar();
 
             // Masquer le bouton "Exporter vers Excel" si l'utilisateur n'est pas admin
